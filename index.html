@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VIP 專屬特權：暱稱更換</title>
+    <style>
+        /* ================= 1. 基礎與變數 ================= */
+        :root { --bg-color: #020617; --card-bg: rgba(255, 255, 255, 0.03); --card-border: rgba(255, 255, 255, 0.08); --text-main: #f8fafc; --text-muted: #94a3b8; --accent-gold: #fbbf24; --accent-glow: rgba(251, 191, 36, 0.2); --danger: #ef4444; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        
+        body { 
+            background-color: var(--bg-color); 
+            background-image: radial-gradient(circle at 50% -20%, #1e1b4b, var(--bg-color) 80%); 
+            color: var(--text-main); 
+            min-height: 100vh; 
+            display: flex; 
+            justify-content: center; 
+            /* 優化：改為 flex-start 配合 margin: auto，防止小螢幕被切頭 */
+            align-items: flex-start; 
+            padding: 20px; 
+        }
+
+        #dev-banner { display: none; position: fixed; top: 0; left: 0; width: 100%; background: repeating-linear-gradient(45deg, #ef4444, #ef4444 10px, #b91c1c 10px, #b91c1c 20px); color: white; text-align: center; padding: 8px; font-weight: bold; z-index: 9999; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+
+        /* ================= 2. 卡片與排版 ================= */
+        .card { 
+            width: 100%; 
+            max-width: 480px; 
+            background: var(--card-bg); 
+            backdrop-filter: blur(20px); 
+            -webkit-backdrop-filter: blur(20px); 
+            border: 1px solid var(--card-border); 
+            border-radius: 24px; 
+            padding: 32px 24px; 
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); 
+            animation: fadeIn 0.6s ease-out; 
+            /* 優化：配合 body 的 flex-start，實現大螢幕置中，小螢幕自然滾動 */
+            margin: auto 0;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 優化：語言切換移入卡片內部，改為相對佈局 */
+        .lang-switch { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 24px; }
+        .lang-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: var(--text-main); padding: 4px 8px; border-radius: 8px; font-size: 12px; cursor: pointer; transition: all 0.3s; }
+        .lang-btn:hover, .lang-btn.active { background: var(--accent-gold); color: #000; border-color: var(--accent-gold); }
+
+        .header { text-align: center; margin-bottom: 24px; }
+        .header h1 { font-size: 24px; font-weight: 700; background: linear-gradient(135deg, #fbbf24, #fde68a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; }
+        .header p { font-size: 14px; color: var(--text-muted); line-height: 1.5; }
+
+        .profile-card { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 16px 20px; border-radius: 16px; margin-bottom: 16px; border: 1px solid var(--card-border); }
+        .profile-info { display: flex; flex-direction: column; gap: 4px; }
+        .profile-label { font-size: 12px; color: var(--text-muted); }
+        .profile-name { font-size: 20px; font-weight: bold; color: #fff; transition: opacity 0.4s ease, transform 0.4s ease; word-break: break-all; }
+        .profile-level-badge { background: linear-gradient(135deg, #fbbf24, #d97706); color: #000; padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: bold; white-space: nowrap; }
+
+        .upgrade-banner { display: block; background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); color: var(--accent-gold); text-align: center; padding: 12px; border-radius: 12px; margin-bottom: 24px; text-decoration: none; font-size: 14px; font-weight: 500; transition: all 0.3s; }
+        .upgrade-banner:hover { background: rgba(251, 191, 36, 0.2); transform: translateY(-2px); }
+
+        .status-box { background: rgba(0,0,0,0.2); border-radius: 16px; padding: 16px; text-align: center; border: 1px solid var(--card-border); margin-bottom: 24px; }
+        .status-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+        .status-value { font-size: 28px; font-weight: 700; color: var(--accent-gold); }
+
+        .skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%); background-size: 200% 100%; animation: pulse 1.5s infinite; border-radius: 8px; color: transparent !important; user-select: none; }
+        @keyframes pulse { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        /* ================= 3. 輸入與按鈕 ================= */
+        .input-group { margin-bottom: 24px; position: relative; }
+        .input-field { width: 100%; padding: 16px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: #fff; font-size: 16px; outline: none; transition: all 0.3s; }
+        .input-field:focus { border-color: var(--accent-gold); box-shadow: 0 0 15px var(--accent-glow); }
+        .input-field:disabled { opacity: 0.5; cursor: not-allowed; }
+        .input-field.invalid { border-color: var(--danger); box-shadow: 0 0 10px rgba(239, 68, 68, 0.3); }
+        .error-msg { display: none; color: var(--danger); font-size: 12px; margin-top: 8px; padding-left: 4px; animation: fadeIn 0.3s ease; }
+
+        .btn-clear-container { text-align: right; margin-top: 8px; }
+        .btn-clear { background: transparent; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; text-decoration: underline; transition: color 0.3s; }
+        .btn-clear:hover { color: #fff; }
+        .btn-clear:disabled { opacity: 0.5; cursor: not-allowed; text-decoration: none; }
+
+        .btn-submit { width: 100%; padding: 16px; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; background: linear-gradient(135deg, #fbbf24, #d97706); color: #000; cursor: pointer; transition: all 0.3s; display: flex; justify-content: center; align-items: center; gap: 8px; }
+        .btn-submit:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 20px var(--accent-glow); }
+        .btn-submit:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .btn-secondary { display: block; width: 100%; text-align: center; padding: 14px; margin-top: 12px; color: var(--text-muted); text-decoration: none; font-size: 14px; font-weight: 500; border-radius: 12px; border: 1px solid transparent; transition: all 0.3s; }
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.05); color: #fff; border-color: rgba(255, 255, 255, 0.1); }
+
+        .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(0,0,0,0.3); border-top-color: #000; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ================= 4. 規則與 Toast ================= */
+        .rules { margin-top: 32px; font-size: 13px; color: var(--text-muted); }
+        .rules h3 { font-size: 14px; color: #fff; margin-bottom: 12px; border-bottom: 1px solid var(--card-border); padding-bottom: 8px; }
+        .rules-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .rule-item { display: flex; justify-content: space-between; background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 6px; }
+        
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 12px 24px; border-radius: 30px; font-weight: 500; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 1000; }
+        .toast.error { background: var(--danger); }
+        .toast.show { opacity: 1; }
+
+        /* ================= 5. 確認彈窗 (Modal) ================= */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); z-index: 2000; justify-content: center; align-items: center; padding: 20px; opacity: 0; transition: opacity 0.3s ease; }
+        .modal-overlay.show { display: flex; opacity: 1; }
+        .modal-card { background: var(--bg-color); border: 1px solid var(--card-border); border-radius: 16px; padding: 24px; max-width: 320px; width: 100%; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.5); transform: scale(0.9); transition: transform 0.3s ease; }
+        .modal-overlay.show .modal-card { transform: scale(1); }
+        .modal-card h3 { color: #fff; font-size: 18px; margin-bottom: 12px; }
+        .modal-card p { color: var(--text-muted); font-size: 14px; margin-bottom: 24px; line-height: 1.5; }
+        .modal-actions { display: flex; gap: 12px; }
+        .modal-actions button { flex: 1; padding: 12px; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; border: none; transition: all 0.2s; }
+        .btn-modal-cancel { background: rgba(255,255,255,0.1); color: #fff; }
+        .btn-modal-cancel:hover { background: rgba(255,255,255,0.2); }
+        .btn-modal-confirm { background: var(--danger); color: #fff; }
+        .btn-modal-confirm:hover { background: #dc2626; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4); }
+
+        /* ================= 6. RWD 手機版優化 ================= */
+        @media (max-width: 480px) {
+            body { padding: 12px; }
+            .card { padding: 24px 16px; border-radius: 20px; }
+            .lang-switch { margin-bottom: 20px; }
+            .lang-btn { padding: 8px 12px; font-size: 13px; } /* 放大胖手指觸控範圍 */
+            .header h1 { font-size: 22px; }
+            .profile-card { padding: 12px 16px; }
+            .profile-name { font-size: 18px; }
+            .status-box { padding: 12px; }
+            .status-value { font-size: 24px; }
+            .rules-grid { grid-template-columns: 1fr; gap: 4px; } /* 規則改為單行排列避免太擠 */
+            .input-field, .btn-submit { padding: 14px; font-size: 15px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="dev-banner">⚠️ 本地預覽模式 (Dev Mode) - 目前顯示為測試假資料！</div>
+
+    <!-- 主體卡片 -->
+    <div class="card">
+        
+        <!-- 優化：語系切換移入卡片內，徹底解決 RWD 跑版與覆蓋問題 -->
+        <div class="lang-switch">
+            <button class="lang-btn active" onclick="setLang('zh-TW')">繁</button>
+            <button class="lang-btn" onclick="setLang('zh-CN')">简</button>
+            <button class="lang-btn" onclick="setLang('en')">EN</button>
+            <button class="lang-btn" onclick="setLang('ja')">日</button>
+        </div>
+
+        <div class="header">
+            <h1 data-i18n="title">👑 VIP 專屬特權</h1>
+            <p data-i18n="subtitle">展現與眾不同的自我，每月享有專屬更換暱稱次數</p>
+        </div>
+
+        <div class="profile-card">
+            <div class="profile-info">
+                <div class="profile-label" data-i18n="current_name_label">現有暱稱</div>
+                <div class="profile-name skeleton" id="val-name">Loading...</div>
+            </div>
+            <div class="profile-level-badge skeleton" id="val-level-badge">Lv. 0</div>
+        </div>
+
+        <a href="https://swag.live/settings/VIP" target="_blank" class="upgrade-banner" data-i18n="upgrade_prompt">
+            🚀 未達等級？升級 VIP 獲得專屬特權！ ➔
+        </a>
+
+        <div class="status-box">
+            <div class="status-label" data-i18n="remaining_times">本月剩餘更換次數</div>
+            <div class="status-value skeleton" id="val-remaining">0</div>
+        </div>
+
+        <div class="input-group">
+            <input type="text" id="input-name" class="input-field" data-i18n-placeholder="input_placeholder" placeholder="輸入您的新暱稱..." maxlength="20" disabled oninput="validateInput()">
+            <div id="name-error" class="error-msg" data-i18n="msg_invalid_format">暱稱包含不可使用的特殊符號</div>
+            <div class="btn-clear-container">
+                <button id="btn-clear" class="btn-clear" onclick="openClearModal()" data-i18n="btn_clear">清空暱稱 (不扣次數)</button>
+            </div>
+        </div>
+
+        <button id="btn-submit" class="btn-submit" disabled onclick="submitName()">
+            <span data-i18n="btn_submit">確認更換</span>
+        </button>
+
+        <a href="https://swag.live/manage-profile/display-name" target="_blank" class="btn-secondary" data-i18n="standard_change">
+            前往一般更改頁面 (每 30 天 1 次) ➔
+        </a>
+
+        <div class="rules">
+            <h3 data-i18n="rules_title">特權對照表 (每月重置)</h3>
+            <div class="rules-grid">
+                <div class="rule-item"><span>Lv. 40 - 59</span><span>1 次/月</span></div>
+                <div class="rule-item"><span>Lv. 60 - 79</span><span>2 次/月</span></div>
+                <div class="rule-item"><span>Lv. 80 - 99</span><span>3 次/月</span></div>
+                <div class="rule-item"><span>Lv. 100+</span><span style="color:var(--accent-gold)">4 次/月</span></div>
+            </div>
+            <div style="margin-top:16px; font-size:12px; line-height:1.6">
+                <span data-i18n="rule_note_1">暱稱規範需符合平台社群守則。</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 清空確認彈窗 -->
+    <div id="confirm-modal" class="modal-overlay">
+        <div class="modal-card">
+            <h3 data-i18n="modal_clear_title">確認清空</h3>
+            <p data-i18n="modal_clear_desc">確定要恢復為預設暱稱嗎？此操作將立即生效且不扣除本月次數。</p>
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" onclick="closeClearModal()" data-i18n="btn_modal_cancel">取消</button>
+                <button class="btn-modal-confirm" onclick="executeClear()" data-i18n="btn_modal_confirm">確定清空</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        const BFF_URL = 'https://swag-name-changer-bff-905468082258.asia-east1.run.app';
+        let state = { token: null, apiUrlPrefix: '', handshakeInterval: null, isDevMode: false, remaining: 0 };
+        const NICKNAME_PATTERN = /^(?!.*([\u0000-\u001F\u007F-\u009F\u0021-\u002F\u003A-\u0040\u005B-\u0060\u007B-\u007E\u00A0-\u00BF\u2000-\u206F\u2070-\u209C\u20A0-\u20C0\u2100-\u214E\u2150-\u218B\u2190-\u21FF\u2200-\u22FF\u2300-\u23FF\u2460-\u24FF\u2500-\u257F\u2580-\u259F\u25A0-\u25FF\u3001-\u303F\uFF00-\uFFEE\n\r])).*/;
+
+        const i18nDict = {
+            'zh-TW': { title: "👑 VIP 專屬特權", subtitle: "展現與眾不同的自我，每月享有專屬更換暱稱次數", current_name_label: "現有暱稱", upgrade_prompt: "🚀 未達等級？升級 VIP 獲得專屬特權！ ➔", remaining_times: "本月剩餘更換次數", input_placeholder: "輸入您的新暱稱...", btn_submit: "確認更換", btn_processing: "處理中", btn_clear: "清空暱稱 (不扣次數)", btn_clearing: "清空中", status_not_set: "尚未設定", standard_change: "前往一般更改頁面 (每 30 天 1 次) ➔", rules_title: "特權對照表 (每月重置)", rule_note_1: "暱稱規範需符合平台社群守則。", msg_success: "暱稱更換成功！", msg_clear_success: "暱稱已清空！", msg_empty: "請輸入暱稱", msg_error: "更換失敗，請稍後再試", msg_invalid_format: "暱稱包含不可使用的特殊符號", msg_rate_limit: "請求過於頻繁，請稍後再試", modal_clear_title: "確認清空", modal_clear_desc: "確定要恢復為預設暱稱嗎？此操作將立即生效且不扣除本月次數。", btn_modal_cancel: "取消", btn_modal_confirm: "確定清空" },
+            'zh-CN': { title: "👑 VIP 专属特权", subtitle: "展现与众不同的自我，每月享有专属更换昵称次数", current_name_label: "现有昵称", upgrade_prompt: "🚀 未达等级？升级 VIP 获得专属特权！ ➔", remaining_times: "本月剩余更换次数", input_placeholder: "输入您的新昵称...", btn_submit: "确认更换", btn_processing: "处理中", btn_clear: "清空昵称 (不扣次数)", btn_clearing: "清空中", status_not_set: "尚未设置", standard_change: "前往一般更改页面 (每 30 天 1 次) ➔", rules_title: "特权对照表 (每月重置)", rule_note_1: "昵称规范需符合平台社区守则。", msg_success: "昵称更换成功！", msg_clear_success: "昵称已清空！", msg_empty: "请输入昵称", msg_error: "更换失败，请稍后再试", msg_invalid_format: "昵称包含不可使用的特殊符号", msg_rate_limit: "请求过于频繁，请稍后再试", modal_clear_title: "确认清空", modal_clear_desc: "确定要恢复为默认昵称吗？此操作将立即生效且不扣除本月次数。", btn_modal_cancel: "取消", btn_modal_confirm: "确定清空" },
+            'en': { title: "👑 VIP Privilege", subtitle: "Show your unique self with monthly exclusive nickname changes", current_name_label: "Current Name", upgrade_prompt: "🚀 Level up to VIP for more privileges! ➔", remaining_times: "Remaining (Month)", input_placeholder: "Enter new nickname...", btn_submit: "Confirm Change", btn_processing: "Processing", btn_clear: "Clear Name (Free)", btn_clearing: "Clearing", status_not_set: "Not Set", standard_change: "Standard Change (1 per 30 days) ➔", rules_title: "Privilege Table (Monthly Reset)", rule_note_1: "Nicknames must comply with platform guidelines.", msg_success: "Nickname changed!", msg_clear_success: "Nickname cleared!", msg_empty: "Please enter a name", msg_error: "Update failed, try again later", msg_invalid_format: "Nickname contains invalid characters", msg_rate_limit: "Too many requests, please try again later", modal_clear_title: "Clear Name", modal_clear_desc: "Are you sure you want to reset to default? This takes effect immediately and costs no monthly limit.", btn_modal_cancel: "Cancel", btn_modal_confirm: "Confirm Clear" },
+            'ja': { title: "👑 VIP限定特権", subtitle: "毎月の専用ニックネーム変更回数で、あなたらしさを表現しましょう", current_name_label: "現在の名前", upgrade_prompt: "🚀 もっと回数が必要ですか？VIPへ！ ➔", remaining_times: "今月の残り回数", input_placeholder: "新しいニックネーム...", btn_submit: "変更を確認", btn_processing: "処理中", btn_clear: "名前をクリア (回数消費なし)", btn_clearing: "クリア中", status_not_set: "未設定", standard_change: "通常の名前変更 (30日ごとに1回) ➔", rules_title: "特権一覧 (毎月リセット)", rule_note_1: "ガイドラインに準拠してください。", msg_success: "変更が完了しました！", msg_clear_success: "名前をクリアしました！", msg_empty: "入力してください", msg_error: "エラーが発生しました", msg_invalid_format: "使用できない文字が含まれています", msg_rate_limit: "アクセスが集中しています。しばらくお待ちください", modal_clear_title: "クリア確認", modal_clear_desc: "デフォルト名に戻しますか？この操作は回数を消費しません。", btn_modal_cancel: "キャンセル", btn_modal_confirm: "確認してクリア" }
+        };
+        let currentLang = 'zh-TW';
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            const dict = i18nDict[lang];
+            document.querySelectorAll('[data-i18n]').forEach(el => el.innerText = dict[el.getAttribute('data-i18n')]);
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => el.placeholder = dict[el.getAttribute('data-i18n-placeholder')]);
+            validateInput();
+        }
+
+        function validateInput() {
+            if (state.remaining <= 0) return;
+            const inputEl = document.getElementById('input-name');
+            const errorEl = document.getElementById('name-error');
+            const btnEl = document.getElementById('btn-submit');
+            const val = inputEl.value;
+
+            if (val && !NICKNAME_PATTERN.test(val)) {
+                inputEl.classList.add('invalid');
+                errorEl.style.display = 'block';
+                btnEl.disabled = true;
+            } else {
+                inputEl.classList.remove('invalid');
+                errorEl.style.display = 'none';
+                btnEl.disabled = false;
+            }
+        }
+
+        // ================= 彈窗控制邏輯 =================
+        function openClearModal() {
+            const modal = document.getElementById('confirm-modal');
+            modal.style.display = 'flex';
+            setTimeout(() => modal.classList.add('show'), 10);
+        }
+
+        function closeClearModal() {
+            const modal = document.getElementById('confirm-modal');
+            modal.classList.remove('show');
+            setTimeout(() => modal.style.display = 'none', 300);
+        }
+
+        // SWAG Iframe
+        function sendIframeReady() { window.parent.postMessage({ type: 'IFRAME_READY' }, '*'); }
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(sendIframeReady, 100);
+            state.handshakeInterval = setInterval(() => { if (!state.token) sendIframeReady(); }, 3000);
+            if (window.self === window.top) setTimeout(() => { if (!state.token) enableDevMode(); }, 2000);
+        });
+        window.addEventListener('message', (event) => {
+            const data = event.data;
+            if (!data) return;
+            if (data.type === 'SET_DOMAIN_CONFIG') state.apiUrlPrefix = data.apiUrlPrefix;
+            if (data.type === 'SET_TOKEN') {
+                state.token = data.token;
+                clearInterval(state.handshakeInterval);
+                fetchUserStatus();
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('a[target="_blank"]');
+            if (!link) return;
+            if (window.self !== window.top) {
+                const url = new URL(link.href);
+                if (url.hostname.includes('swag.live') && !url.hostname.includes('creators')) {
+                    e.preventDefault();
+                    window.parent.postMessage({ type: 'PWA_NAVIGATE', url: link.href }, '*');
+                }
+            }
+        });
+
+        async function fetchUserStatus() {
+            try {
+                const res = await fetch(`${BFF_URL}/api/status`, { headers: { 'Authorization': `Bearer ${state.token}` } });
+                const data = await res.json();
+                if (res.status === 429) return showToast(i18nDict[currentLang].msg_rate_limit, true);
+                if (res.ok) updateUI(data.current_name, data.level, data.remaining);
+                else showToast(data.error || 'Fetch failed', true);
+            } catch (err) { showToast('API Connection Error', true); }
+        }
+
+        // ================= 清空 API (由彈窗確認後觸發) =================
+        async function executeClear() {
+            closeClearModal(); 
+            
+            const inputEl = document.getElementById('input-name');
+            const btnEl = document.getElementById('btn-submit');
+            const btnClear = document.getElementById('btn-clear');
+
+            btnEl.disabled = true;
+            inputEl.disabled = true;
+            btnClear.disabled = true;
+            
+            let countdown = 5;
+            const processingText = i18nDict[currentLang].btn_clearing;
+            btnEl.innerHTML = `<div class="spinner"></div>&nbsp;&nbsp;<span>${processingText} (${countdown}s)</span>`;
+            
+            const countInterval = setInterval(() => {
+                countdown--;
+                if(countdown > 0) btnEl.innerHTML = `<div class="spinner"></div>&nbsp;&nbsp;<span>${processingText} (${countdown}s)</span>`;
+            }, 1000);
+
+            const minWait = new Promise(resolve => setTimeout(resolve, 5000));
+            let res, apiData;
+
+            try {
+                const apiPromise = state.isDevMode ? 
+                    new Promise(r => setTimeout(() => r({ ok: true, json: async () => ({success: true}) }), 1000)) :
+                    fetch(`${BFF_URL}/api/clear_name`, { method: 'POST', headers: { 'Authorization': `Bearer ${state.token}` }});
+                
+                const [_, apiRes] = await Promise.all([minWait, apiPromise]);
+                res = apiRes;
+                apiData = await res.json();
+            } catch (err) {
+                res = { ok: false, status: 500 };
+                apiData = { error: 'Connection Error' };
+            }
+
+            clearInterval(countInterval);
+            btnClear.disabled = false;
+
+            if (res.status === 429) {
+                showToast(i18nDict[currentLang].msg_rate_limit, true);
+                resetBtnState();
+                return;
+            }
+
+            if (res.ok) {
+                showToast(i18nDict[currentLang].msg_clear_success);
+                inputEl.value = '';
+                
+                const nameEl = document.getElementById('val-name');
+                nameEl.style.opacity = '0';
+                nameEl.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    nameEl.innerText = i18nDict[currentLang].status_not_set;
+                    nameEl.style.opacity = '1';
+                    nameEl.style.transform = 'scale(1)';
+                }, 400);
+
+                if (!state.isDevMode) fetchUserStatus(); 
+                else updateUI('', 85, state.remaining); 
+            } else {
+                showToast(apiData.error || i18nDict[currentLang].msg_error, true);
+                resetBtnState();
+            }
+        }
+
+        // ================= 更改 API =================
+        async function submitName() {
+            const inputEl = document.getElementById('input-name');
+            const btnEl = document.getElementById('btn-submit');
+            const btnClear = document.getElementById('btn-clear');
+            const newName = inputEl.value.trim();
+
+            if (!newName) return showToast(i18nDict[currentLang].msg_empty, true);
+            if (!NICKNAME_PATTERN.test(newName)) return showToast(i18nDict[currentLang].msg_invalid_format, true);
+            if (state.remaining <= 0) return;
+
+            btnEl.disabled = true;
+            inputEl.disabled = true;
+            btnClear.disabled = true;
+            
+            let countdown = 5;
+            const processingText = i18nDict[currentLang].btn_processing;
+            btnEl.innerHTML = `<div class="spinner"></div>&nbsp;&nbsp;<span>${processingText} (${countdown}s)</span>`;
+            
+            const countInterval = setInterval(() => {
+                countdown--;
+                if(countdown > 0) btnEl.innerHTML = `<div class="spinner"></div>&nbsp;&nbsp;<span>${processingText} (${countdown}s)</span>`;
+            }, 1000);
+
+            const minWait = new Promise(resolve => setTimeout(resolve, 5000));
+            let res, apiData;
+
+            try {
+                const apiPromise = state.isDevMode ? 
+                    new Promise(r => setTimeout(() => r({ ok: true, json: async () => ({success: true, new_name: newName}) }), 1000)) :
+                    fetch(`${BFF_URL}/api/change_name`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${state.token}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ display_name: newName })
+                    });
+                
+                const[_, apiRes] = await Promise.all([minWait, apiPromise]);
+                res = apiRes;
+                apiData = await res.json();
+            } catch (err) {
+                res = { ok: false, status: 500 };
+                apiData = { error: 'Connection Error' };
+            }
+
+            clearInterval(countInterval);
+            btnClear.disabled = false;
+
+            if (res.status === 429) {
+                showToast(i18nDict[currentLang].msg_rate_limit, true);
+                resetBtnState();
+                return;
+            }
+
+            if (res.ok) {
+                showToast(i18nDict[currentLang].msg_success);
+                inputEl.value = '';
+                
+                const nameEl = document.getElementById('val-name');
+                nameEl.style.opacity = '0';
+                nameEl.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    nameEl.innerText = apiData.new_name || newName;
+                    nameEl.style.opacity = '1';
+                    nameEl.style.transform = 'scale(1)';
+                }, 400);
+
+                if (!state.isDevMode) fetchUserStatus(); 
+                else updateUI(newName, 85, state.remaining - 1);
+            } else {
+                showToast(apiData.error || i18nDict[currentLang].msg_error, true);
+                resetBtnState();
+            }
+        }
+
+        function updateUI(currentName, level, remaining) {
+            state.remaining = remaining;
+            
+            const elName = document.getElementById('val-name');
+            const elLevel = document.getElementById('val-level-badge');
+            const elRemaining = document.getElementById('val-remaining');
+            const inputEl = document.getElementById('input-name');
+            const errorEl = document.getElementById('name-error');
+
+            [elName, elLevel, elRemaining].forEach(el => el.classList.remove('skeleton'));
+
+            elName.innerText = currentName || i18nDict[currentLang].status_not_set;
+            elLevel.innerText = `Lv. ${level}`;
+            elRemaining.innerText = remaining;
+
+            if (remaining > 0) {
+                inputEl.disabled = false;
+                elRemaining.style.color = 'var(--accent-gold)';
+                inputEl.placeholder = i18nDict[currentLang].input_placeholder;
+            } else {
+                inputEl.disabled = true;
+                elRemaining.style.color = 'var(--text-muted)';
+                inputEl.placeholder = "本月次數已用盡";
+                inputEl.classList.remove('invalid');
+                errorEl.style.display = 'none';
+            }
+            
+            resetBtnState();
+        }
+
+        function resetBtnState() {
+            const btnEl = document.getElementById('btn-submit');
+            btnEl.disabled = (state.remaining <= 0);
+            document.getElementById('input-name').disabled = (state.remaining <= 0);
+            btnEl.innerHTML = `<span data-i18n="btn_submit">${i18nDict[currentLang].btn_submit}</span>`;
+            validateInput(); 
+        }
+
+        function enableDevMode() {
+            state.isDevMode = true;
+            document.getElementById('dev-banner').style.display = 'block';
+            clearInterval(state.handshakeInterval);
+            updateUI('SWAG_Demo_User', 85, 3);
+        }
+
+        function showToast(msg, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.className = `toast show ${isError ? 'error' : ''}`;
+            setTimeout(() => toast.className = 'toast', 3000);
+        }
+    </script>
+</body>
+</html>
